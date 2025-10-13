@@ -15,7 +15,10 @@ type DB struct {
 }
 
 type Config struct {
-	DB *DB
+	Port      string
+	NatsUrl   string
+	JWTSecret string
+	DB        *DB
 }
 
 func NewConfig() *Config {
