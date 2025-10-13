@@ -21,3 +21,11 @@ func NewDB(config *config.Config) *DB {
 func (db *DB) Close() error {
 	return db.conn.Close()
 }
+
+func (db *DB) GetConnection() *sql.DB {
+	if db == nil {
+		return nil
+	}
+
+	return db.conn
+}
