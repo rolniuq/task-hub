@@ -1,7 +1,32 @@
 package main
 
-import "fmt"
+import (
+	"context"
+	"taskhub/config"
+	"taskhub/internal/gateway"
+	"taskhub/pkg/logger"
+
+	"go.uber.org/fx"
+)
+
+func startApp(lc fx.Lifecycle, gw *gateway.Gateway) {
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			return gw.Start()
+		},
+		OnStop: func(ctx context.Context) error {
+			return gw.Shutdown(ctx)
+		},
+	})
+}
 
 func main() {
-	fmt.Println("Hello world")
+	app := fx.New(
+		config.ConfigModule,
+		logger.LoggerModule,
+		gateway.GatewayModule,
+		fx.Invoke(startApp),
+	)
+
+	app.Run()
 }

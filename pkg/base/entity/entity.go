@@ -9,6 +9,7 @@ import (
 type BaseEntity struct {
 	Id        uuid.UUID
 	CreatedAt time.Time
+	CreatedBy uuid.UUID
 	UpdateAt  *time.Time
 	UpdateBy  *uuid.UUID
 	DeletedAt *time.Time

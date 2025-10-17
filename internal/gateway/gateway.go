@@ -1,21 +1,32 @@
 package gateway
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"taskhub/config"
+	"taskhub/pkg/logger"
 	"taskhub/pkg/nats"
+
+	"go.uber.org/fx"
+)
+
+var GatewayModule = fx.Module(
+	"gateway",
+	fx.Provide(NewGateway),
 )
 
 type Gateway struct {
 	config     *config.Config
 	natsConn   *nats.Nats
 	httpServer *http.Server
+	logger     *logger.Logger
 }
 
-func NewGateway(config *config.Config) *Gateway {
+func NewGateway(config *config.Config, logger *logger.Logger) *Gateway {
 	return &Gateway{
-		natsConn: nats.NewNats(config),
+		natsConn: nats.NewNats(config, logger),
+		logger:   logger,
 	}
 }
 
@@ -31,12 +42,28 @@ func (g *Gateway) Start() error {
 	mux.HandleFunc("/health", healthCheck)
 
 	g.httpServer = &http.Server{
-		Addr: fmt.Sprintf(":%s", g.config.Port),
+		Addr:         fmt.Sprintf(":%s", g.config.Port),
+		Handler:      mux,
+		ReadTimeout:  g.config.ReadTimeout,
+		WriteTimeout: g.config.WriteTimeout,
+		IdleTimeout:  g.config.IdleTimeout,
 	}
+
+	g.logger.Info("Starting HTTP server on port %s", g.config.Port)
 
 	return g.httpServer.ListenAndServe()
 }
 
-func (g *Gateway) Shutdown() error {
+func (g *Gateway) Shutdown(ctx context.Context) error {
+	g.logger.Info("Shutting down HTTP server")
+
+	if g.natsConn != nil {
+		g.natsConn.Close()
+	}
+
+	if g.httpServer != nil {
+		return g.httpServer.Shutdown(ctx)
+	}
+
 	return nil
 }
