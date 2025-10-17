@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"time"
 )
 
 type DB struct {
@@ -15,14 +16,20 @@ type DB struct {
 }
 
 type Config struct {
-	Port      string
-	NatsUrl   string
-	JWTSecret string
-	DB        *DB
+	Port         string
+	NatsUrl      string
+	JWTSecret    string
+	DB           *DB
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	IdleTimeout  time.Duration
 }
 
 func NewConfig() *Config {
 	return &Config{
+		Port:      os.Getenv("PORT"),
+		NatsUrl:   os.Getenv("NATS_URL"),
+		JWTSecret: os.Getenv("JWT_SECRET"),
 		DB: &DB{
 			Host:     os.Getenv("DB_HOST"),
 			Port:     os.Getenv("DB_PORT"),
@@ -30,6 +37,9 @@ func NewConfig() *Config {
 			Password: os.Getenv("DB_PASSWORD"),
 			DBName:   os.Getenv("DB_NAME"),
 		},
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 }
 

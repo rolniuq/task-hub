@@ -2,17 +2,20 @@ package nats
 
 import (
 	"taskhub/config"
+	"taskhub/pkg/logger"
 
 	"github.com/nats-io/nats.go"
 )
 
 type Nats struct {
-	conn *nats.Conn
+	conn   *nats.Conn
+	logger *logger.Logger
 }
 
-func NewNats(config *config.Config) *Nats {
+func NewNats(config *config.Config, logger *logger.Logger) *Nats {
 	conn, err := nats.Connect(config.NatsUrl)
 	if err != nil {
+		logger.Error("failed to connect to nats: %v", err)
 		return nil
 	}
 
