@@ -5,6 +5,12 @@ import (
 	"taskhub/pkg/logger"
 
 	"github.com/nats-io/nats.go"
+	"go.uber.org/fx"
+)
+
+var NatsModule = fx.Module(
+	"nats",
+	fx.Provide(NewNats),
 )
 
 type Nats struct {

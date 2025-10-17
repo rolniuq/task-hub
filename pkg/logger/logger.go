@@ -1,6 +1,15 @@
 package logger
 
-import "log/slog"
+import (
+	"log/slog"
+
+	"go.uber.org/fx"
+)
+
+var LoggerModule = fx.Module(
+	"logger",
+	fx.Provide(NewLogger),
+)
 
 type Logger struct {
 	slog *slog.Logger

@@ -7,6 +7,13 @@ import (
 	"taskhub/config"
 	"taskhub/pkg/logger"
 	"taskhub/pkg/nats"
+
+	"go.uber.org/fx"
+)
+
+var GatewayModule = fx.Module(
+	"gateway",
+	fx.Provide(NewGateway),
 )
 
 type Gateway struct {

@@ -5,6 +5,14 @@ import (
 	"net/url"
 	"os"
 	"time"
+
+	"github.com/joho/godotenv"
+	"go.uber.org/fx"
+)
+
+var ConfigModule = fx.Module(
+	"config",
+	fx.Provide(NewConfig),
 )
 
 type DB struct {
@@ -26,6 +34,10 @@ type Config struct {
 }
 
 func NewConfig() *Config {
+	if err := godotenv.Load(); err != nil {
+		panic(err)
+	}
+
 	return &Config{
 		Port:      os.Getenv("PORT"),
 		NatsUrl:   os.Getenv("NATS_URL"),
