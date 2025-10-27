@@ -1,6 +1,10 @@
-package util
+package utils
 
-import "context"
+import (
+	"context"
+
+	"github.com/google/uuid"
+)
 
 func GetContextKey[T any](ctx context.Context, key string) *T {
 	val := ctx.Value(key)
@@ -22,4 +26,8 @@ func GetPointerValue[V any](v *V) V {
 	}
 
 	return val
+}
+
+func NewUUID() uuid.UUID {
+	return uuid.New()
 }

@@ -1,0 +1,14 @@
+version: "3"
+
+tasks:
+  build:
+    cmds:
+      - docker build -t task-hub .
+
+  down:
+    cmds:
+      - docker compose down
+
+  run:
+    cmds:
+      - docker compose up -d

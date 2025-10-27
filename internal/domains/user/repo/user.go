@@ -8,6 +8,7 @@ import (
 	"taskhub/pkg/db"
 	"taskhub/pkg/logger"
 
+	"github.com/google/uuid"
 	"go.uber.org/fx"
 )
 
@@ -30,5 +31,12 @@ func NewUserRepository(config *config.Config, logger *logger.Logger) *UserReposi
 }
 
 func (r *UserRepository) Create(ctx context.Context, user *user.User) (*user.User, error) {
-	return nil, nil
+	query := `INSERT INTO users (id, name, email, password) VALUES ($1, $2, $3) RETURNING id`
+
+	var id uuid.UUID
+	if err := r.conn.QueryRowContext(ctx, query, user.Id, user.Name, user.Email, user.Password).Scan(&id); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
