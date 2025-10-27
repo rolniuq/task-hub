@@ -5,6 +5,7 @@ import (
 	"taskhub/config"
 	"taskhub/internal/gateway"
 	"taskhub/pkg/logger"
+	"taskhub/pkg/nats"
 
 	"go.uber.org/fx"
 )
@@ -25,6 +26,7 @@ func main() {
 		config.ConfigModule,
 		logger.LoggerModule,
 		gateway.GatewayModule,
+		nats.NatsModule,
 		fx.Invoke(startApp),
 	)
 

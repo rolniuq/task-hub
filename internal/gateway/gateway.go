@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"taskhub/config"
@@ -25,6 +26,7 @@ type Gateway struct {
 
 func NewGateway(config *config.Config, logger *logger.Logger) *Gateway {
 	return &Gateway{
+		config:   config,
 		natsConn: nats.NewNats(config, logger),
 		logger:   logger,
 	}
@@ -37,6 +39,10 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 func handleEvent(w http.ResponseWriter, r *http.Request) {}
 
 func (g *Gateway) Start() error {
+	if g.config == nil {
+		return errors.New("config is nil")
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/:events", handleEvent)
 	mux.HandleFunc("/health", healthCheck)
