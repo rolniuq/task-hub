@@ -2,13 +2,40 @@ version: "3"
 
 tasks:
   build:
+    desc: "Build Task Hub web version Docker image"
     cmds:
       - docker build -t task-hub .
 
+  build-desktop:
+    desc: "Build Task Hub desktop version Docker image"
+    cmds:
+      - docker build --platform linux/arm64 -f Dockerfile.desktop -t task-hub-desktop .
+
   down:
+    desc: "Stop all Task Hub services"
     cmds:
       - docker compose down
 
   run:
+    desc: "Run Task Hub web version with Docker"
     cmds:
       - docker compose up -d
+
+  run-web:
+    desc: "Run Task Hub web version with Docker (alias for run)"
+    cmds:
+      - docker compose up -d
+
+  run-desktop:
+    desc: "Run Task Hub desktop version natively with Docker services"
+    cmds:
+      - docker compose up -d db nats
+      - go run cmd/desktop/main.go
+
+  clean:
+    desc: "Clean all Task Hub Docker images, volumes, and containers"
+    cmds:
+      - docker compose down -v --remove-orphans
+      - docker system prune -f
+      - docker volume prune -f
+      - docker image prune -f

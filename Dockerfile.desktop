@@ -1,0 +1,24 @@
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+
+RUN go mod download && go mod verify
+
+COPY . .
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+RUN CGO_ENABLED=0 GOOS=$(echo $TARGETPLATFORM | cut -d'/' -f1) go build -a -installsuffix cgo -o task-hub-desktop ./cmd/desktop/main.go
+
+FROM --platform=$TARGETPLATFORM alpine:latest
+
+RUN apk --no-cache add ca-certificates tzdata
+
+WORKDIR /root/
+
+COPY --from=builder /app/task-hub-desktop .
+
+CMD ["./task-hub-desktop"]
