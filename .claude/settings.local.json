@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go get golang.org/x/crypto/bcrypt github.com/golang-jwt/jwt/v5 github.com/stretchr/testify github.com/lib/pq)",
+      "Bash(go build ./...)",
+      "Bash(go test ./... -v)",
+      "Bash(go mod tidy)"
+    ]
+  }
+}
