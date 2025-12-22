@@ -1,0 +1,161 @@
+name: Performance and Load Testing
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-bench-${{ hashFiles('**/go.sum') }}
+
+      - name: Build application
+        run: |
+          go build -o bin/web-app ./cmd/main.go
+          go build -o bin/desktop-app ./cmd/desktop/main.go
+
+      - name: Start services
+        run: |
+          docker compose up -d db nats
+          sleep 10
+
+      - name: Run benchmarks
+        run: |
+          # Run Go benchmarks if they exist
+          if [ -d "**/*_test.go" ]; then
+            go test -bench=. -benchmem -count=3 ./... | tee benchmark.txt
+          fi
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: test_user
+          DB_PASSWORD: test_password
+          DB_NAME: test_db
+          NATS_URL: nats://localhost:4222
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          tool: 'go'
+          output-file-path: benchmark.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+
+      - name: Cleanup
+        run: docker compose down
+
+  load-test:
+    name: Load Testing
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Build and start application
+        run: |
+          go build -o bin/web-app ./cmd/main.go
+          docker compose up -d db nats
+          ./bin/web-app &
+          sleep 15
+
+      - name: Install hey
+        run: go install github.com/rakyll/hey@latest
+
+      - name: Run load tests
+        run: |
+          # Wait for app to be ready
+          sleep 10
+          
+          # Basic load test
+          hey -n 1000 -c 10 -m GET http://localhost:8080/ || true
+          
+          # API load tests (if endpoints exist)
+          hey -n 500 -c 5 -m POST -d '{"username":"test","password":"test"}' http://localhost:8080/api/auth/login || true
+
+      - name: Upload load test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-test-results
+          path: hey-*.html
+
+      - name: Cleanup
+        run: |
+          pkill -f web-app || true
+          docker compose down
+
+  memory-profiling:
+    name: Memory Profiling
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: Start services
+        run: docker compose up -d db nats
+
+      - name: Run memory profiling
+        run: |
+          # Build with profiling support
+          go build -o bin/web-app ./cmd/main.go
+          
+          # Run with memory profiling
+          GOMAXPROCS=2 ./bin/web-app &
+          APP_PID=$!
+          
+          sleep 10
+          
+          # Capture memory profile
+          curl http://localhost:8080/debug/pprof/heap > heap.prof
+          curl http://localhost:8080/debug/pprof/profile > cpu.prof
+          
+          # Analyze memory usage
+          go tool pprof -text heap.prof > memory-analysis.txt
+          go tool pprof -text cpu.prof > cpu-analysis.txt
+          
+          kill $APP_PID
+
+      - name: Upload profiling results
+        uses: actions/upload-artifact@v4
+        with:
+          name: profiling-results
+          path: |
+            *.prof
+            *-analysis.txt
+
+      - name: Cleanup
+        run: docker compose down

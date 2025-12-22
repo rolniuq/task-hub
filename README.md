@@ -1,5 +1,11 @@
 # Task Hub
 
+[![CI/CD Pipeline](https://github.com/${{ github.repository }}/actions/workflows/ci.yml/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/ci.yml)
+[![Dependencies](https://github.com/${{ github.repository }}/actions/workflows/dependencies.yml/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/dependencies.yml)
+[![Performance](https://github.com/${{ github.repository }}/actions/workflows/performance.yml/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/performance.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/${{ github.repository }})](https://goreportcard.com/report/github.com/${{ github.repository }})
+[![Coverage](https://codecov.io/gh/${{ github.repository }}/branch/main/graph/badge.svg)](https://codecov.io/gh/${{ github.repository }})
+
 A modern task management application with both web and desktop interfaces built with Go, PostgreSQL, and NATS messaging.
 
 ## 🚀 Features
