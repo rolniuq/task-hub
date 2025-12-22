@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  task-hub-desktop:
+    container_name: task-hub-desktop
+    build:
+      context: .
+      dockerfile: ./Dockerfile.desktop
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      - db
+      - nats
+    networks:
+      - taskhub-network
+
+  db:
+    image: postgres:16.3-alpine3.20
+    container_name: taskhub-db
+    ports:
+      - "5432:5432"
+    env_file: .env
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./.init:/docker-entrypoint-initdb.d
+    networks:
+      - taskhub-network
+
+  nats:
+    image: nats
+    container_name: taskhub-nats
+    ports:
+      - "4222:4222"
+    restart: unless-stopped
+    networks:
+      - taskhub-network
+
+volumes:
+  db_data:
+
+networks:
+  taskhub-network:
+    driver: bridge

@@ -76,13 +76,14 @@ func (g *Gateway) Start() error {
 	})
 	mux.HandleFunc("/login", g.webHandler.Login)
 	mux.HandleFunc("/register", g.webHandler.Register)
+	mux.Handle("/dashboard", g.authMiddleware.Authenticate(http.HandlerFunc(g.webHandler.Dashboard)))
 
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
 	mux.HandleFunc("/api/auth/register", g.authHandler.Register)
 	mux.HandleFunc("/api/auth/login", g.authHandler.Login)
-	mux.HandleFunc("/api/auth/refresh", g.authHandler.RefreshToken)
-	mux.HandleFunc("/api/auth/logout", g.authHandler.Logout)
+	mux.Handle("/api/auth/refresh", g.authMiddleware.Authenticate(http.HandlerFunc(g.authHandler.RefreshToken)))
+	mux.Handle("/api/auth/logout", g.authMiddleware.Authenticate(http.HandlerFunc(g.authHandler.Logout)))
 
 	mux.Handle("/api/tasks", g.authMiddleware.Authenticate(http.HandlerFunc(g.handleTasks)))
 	mux.Handle("/api/tasks/", g.authMiddleware.Authenticate(http.HandlerFunc(g.handleTaskByID)))
