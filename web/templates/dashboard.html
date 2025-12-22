@@ -1,0 +1,249 @@
+{{template "base.html" .}}
+
+{{define "title"}}Dashboard - TaskHub{{end}}
+
+{{define "content"}}
+<div class="dashboard-container">
+    <header class="dashboard-header">
+        <h1>TaskHub</h1>
+        <nav>
+            <button hx-post="/api/auth/logout"
+                    hx-swap="none"
+                    class="btn btn-outline">
+                Logout
+            </button>
+        </nav>
+    </header>
+
+    <main class="dashboard-main">
+        <div class="tasks-header">
+            <h2>My Tasks</h2>
+            <button class="btn btn-primary" onclick="document.getElementById('taskModal').showModal()">
+                + New Task
+            </button>
+        </div>
+
+        <div id="task-filters" class="task-filters">
+            <select hx-get="/api/tasks"
+                    hx-target="#task-list"
+                    hx-swap="innerHTML"
+                    hx-include="[name='status'], [name='priority']"
+                    name="status">
+                <option value="">All Status</option>
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="done">Done</option>
+            </select>
+
+            <select hx-get="/api/tasks"
+                    hx-target="#task-list"
+                    hx-swap="innerHTML"
+                    hx-include="[name='status'], [name='priority']"
+                    name="priority">
+                <option value="">All Priority</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+            </select>
+        </div>
+
+        <div id="task-list"
+             hx-get="/api/tasks"
+             hx-trigger="load"
+             hx-swap="innerHTML"
+             class="task-list">
+            <div class="loading">Loading tasks...</div>
+        </div>
+    </main>
+
+    <dialog id="taskModal" class="modal">
+        <div class="modal-content">
+            <h3>Create New Task</h3>
+            <form hx-post="/api/tasks"
+                  hx-target="#task-list"
+                  hx-swap="innerHTML"
+                  hx-on::after-request="this.reset(); document.getElementById('taskModal').close();">
+
+                <div class="form-group">
+                    <label for="title">Title</label>
+                    <input type="text" id="title" name="title" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="priority">Priority</label>
+                    <select id="priority" name="priority">
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="deadline">Deadline</label>
+                    <input type="datetime-local" id="deadline" name="deadline">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('taskModal').close()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Create Task
+                    </button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+</div>
+
+<style>
+.dashboard-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.dashboard-header h1 {
+    color: #667eea;
+}
+
+.btn-outline {
+    background: transparent;
+    border: 2px solid #667eea;
+    color: #667eea;
+}
+
+.btn-outline:hover {
+    background: #667eea;
+    color: white;
+}
+
+.tasks-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.task-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.task-filters select {
+    padding: 8px 12px;
+    border: 2px solid #e1e1e1;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.task-card {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.task-info h4 {
+    margin-bottom: 4px;
+}
+
+.task-info p {
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.task-meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.badge-high { background: #fee2e2; color: #dc2626; }
+.badge-medium { background: #fef3c7; color: #d97706; }
+.badge-low { background: #d1fae5; color: #059669; }
+.badge-todo { background: #e0e7ff; color: #4f46e5; }
+.badge-in_progress { background: #fef3c7; color: #d97706; }
+.badge-done { background: #d1fae5; color: #059669; }
+
+.task-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.task-actions button {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.modal {
+    border: none;
+    border-radius: 16px;
+    padding: 0;
+    max-width: 500px;
+    width: 90%;
+}
+
+.modal::backdrop {
+    background: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    padding: 24px;
+}
+
+.modal-content h3 {
+    margin-bottom: 20px;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+}
+</style>
+{{end}}
