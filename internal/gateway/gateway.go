@@ -22,12 +22,13 @@ var GatewayModule = fx.Module(
 )
 
 type Gateway struct {
-	config       *config.Config
-	natsConn     *nats.Nats
-	httpServer   *http.Server
-	logger       *logger.Logger
-	authHandler  *handler.AuthHandler
-	taskHandler  *handler.TaskHandler
+	config         *config.Config
+	natsConn       *nats.Nats
+	httpServer     *http.Server
+	logger         *logger.Logger
+	authHandler    *handler.AuthHandler
+	taskHandler    *handler.TaskHandler
+	webHandler     *handler.WebHandler
 	authMiddleware *middleware.AuthMiddleware
 }
 
@@ -37,12 +38,18 @@ func NewGateway(
 	authService *app.AuthService,
 	taskService *app.TaskService,
 ) *Gateway {
+	webHandler, err := handler.NewWebHandler("web/templates")
+	if err != nil {
+		logger.Error("failed to load templates", "error", err)
+	}
+
 	return &Gateway{
-		config:       config,
-		natsConn:     nats.NewNats(config, logger),
-		logger:       logger,
-		authHandler:  handler.NewAuthHandler(authService),
-		taskHandler:  handler.NewTaskHandler(taskService),
+		config:         config,
+		natsConn:       nats.NewNats(config, logger),
+		logger:         logger,
+		authHandler:    handler.NewAuthHandler(authService),
+		taskHandler:    handler.NewTaskHandler(taskService),
+		webHandler:     webHandler,
 		authMiddleware: middleware.NewAuthMiddleware(authService),
 	}
 }
@@ -60,9 +67,22 @@ func (g *Gateway) Start() error {
 
 	mux.HandleFunc("/health", healthCheck)
 
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		http.NotFound(w, r)
+	})
+	mux.HandleFunc("/login", g.webHandler.Login)
+	mux.HandleFunc("/register", g.webHandler.Register)
+
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+
 	mux.HandleFunc("/api/auth/register", g.authHandler.Register)
 	mux.HandleFunc("/api/auth/login", g.authHandler.Login)
 	mux.HandleFunc("/api/auth/refresh", g.authHandler.RefreshToken)
+	mux.HandleFunc("/api/auth/logout", g.authHandler.Logout)
 
 	mux.Handle("/api/tasks", g.authMiddleware.Authenticate(http.HandlerFunc(g.handleTasks)))
 	mux.Handle("/api/tasks/", g.authMiddleware.Authenticate(http.HandlerFunc(g.handleTaskByID)))
