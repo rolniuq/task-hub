@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"taskhub/internal/domains/task"
 	"taskhub/internal/domains/task/repo"
 	"taskhub/pkg/logger"
@@ -119,6 +120,7 @@ type ListTasksRequest struct {
 	Status   *task.TaskStatus   `json:"status,omitempty"`
 	Priority *task.TaskPriority `json:"priority,omitempty"`
 	Deadline *time.Time         `json:"deadline,omitempty"`
+	Search   string             `json:"search,omitempty"`
 }
 
 type ListTasksResponse struct {
@@ -136,6 +138,19 @@ func (s *TaskService) ListTasks(ctx context.Context, req *ListTasksRequest, user
 	tasks, err := s.taskRepo.FindAll(ctx, filter)
 	if err != nil {
 		return nil, err
+	}
+
+	// Apply search filter client-side for now
+	if req.Search != "" {
+		var filteredTasks []*task.Task
+		searchLower := strings.ToLower(req.Search)
+		for _, t := range tasks {
+			if strings.Contains(strings.ToLower(t.Title), searchLower) ||
+				strings.Contains(strings.ToLower(t.Description), searchLower) {
+				filteredTasks = append(filteredTasks, t)
+			}
+		}
+		tasks = filteredTasks
 	}
 
 	return &ListTasksResponse{Tasks: tasks}, nil

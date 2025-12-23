@@ -18,16 +18,45 @@
     <main class="dashboard-main">
         <div class="tasks-header">
             <h2>My Tasks</h2>
-            <button class="btn btn-primary" onclick="document.getElementById('taskModal').showModal()">
-                + New Task
-            </button>
+            <div class="header-actions">
+                <input type="text" 
+                       id="search-input" 
+                       placeholder="Search tasks..." 
+                       hx-get="/api/tasks"
+                       hx-target="#task-list"
+                       hx-trigger="keyup changed delay:500ms"
+                       hx-include="[name='status'], [name='priority']"
+                       name="search">
+                <button class="btn btn-primary" onclick="document.getElementById('taskModal').showModal()">
+                    + New Task
+                </button>
+            </div>
+        </div>
+
+        <div class="dashboard-stats" id="dashboard-stats">
+            <div class="stat-card">
+                <h3>Total Tasks</h3>
+                <span class="stat-number" id="total-tasks">-</span>
+            </div>
+            <div class="stat-card">
+                <h3>To Do</h3>
+                <span class="stat-number" id="todo-tasks">-</span>
+            </div>
+            <div class="stat-card">
+                <h3>In Progress</h3>
+                <span class="stat-number" id="progress-tasks">-</span>
+            </div>
+            <div class="stat-card">
+                <h3>Completed</h3>
+                <span class="stat-number" id="done-tasks">-</span>
+            </div>
         </div>
 
         <div id="task-filters" class="task-filters">
             <select hx-get="/api/tasks"
                     hx-target="#task-list"
                     hx-swap="innerHTML"
-                    hx-include="[name='status'], [name='priority']"
+                    hx-include="[name='status'], [name='priority'], #search-input"
                     name="status">
                 <option value="">All Status</option>
                 <option value="todo">To Do</option>
@@ -38,13 +67,21 @@
             <select hx-get="/api/tasks"
                     hx-target="#task-list"
                     hx-swap="innerHTML"
-                    hx-include="[name='status'], [name='priority']"
+                    hx-include="[name='status'], [name='priority'], #search-input"
                     name="priority">
                 <option value="">All Priority</option>
                 <option value="high">High</option>
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
             </select>
+
+            <button class="btn btn-outline btn-sm" 
+                    hx-get="/api/tasks"
+                    hx-target="#task-list"
+                    hx-include="[name='status'], [name='priority'], #search-input"
+                    hx-params='status:"",priority:""'>
+                Clear Filters
+            </button>
         </div>
 
         <div id="task-list"
@@ -58,41 +95,51 @@
 
     <dialog id="taskModal" class="modal">
         <div class="modal-content">
-            <h3>Create New Task</h3>
-            <form hx-post="/api/tasks"
-                  hx-target="#task-list"
-                  hx-swap="innerHTML"
-                  hx-on::after-request="this.reset(); document.getElementById('taskModal').close();">
+            <h3 id="modal-title">Create New Task</h3>
+            <form id="task-form" hx-post="/api/tasks">
+                
+                <input type="hidden" id="task-id" name="id">
 
                 <div class="form-group">
-                    <label for="title">Title</label>
-                    <input type="text" id="title" name="title" required>
+                    <label for="modal-title-input">Title</label>
+                    <input type="text" id="modal-title-input" name="title" required>
                 </div>
 
                 <div class="form-group">
-                    <label for="description">Description</label>
-                    <textarea id="description" name="description" rows="3"></textarea>
+                    <label for="modal-description">Description</label>
+                    <textarea id="modal-description" name="description" rows="3"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="modal-priority">Priority</label>
+                        <select id="modal-priority" name="priority">
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="modal-status">Status</label>
+                        <select id="modal-status" name="status">
+                            <option value="todo">To Do</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="done">Done</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="form-group">
-                    <label for="priority">Priority</label>
-                    <select id="priority" name="priority">
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="low">Low</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="deadline">Deadline</label>
-                    <input type="datetime-local" id="deadline" name="deadline">
+                    <label for="modal-deadline">Deadline</label>
+                    <input type="datetime-local" id="modal-deadline" name="deadline">
                 </div>
 
                 <div class="modal-actions">
                     <button type="button" class="btn btn-outline" onclick="document.getElementById('taskModal').close()">
                         Cancel
                     </button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" id="modal-submit-btn">
                         Create Task
                     </button>
                 </div>
@@ -103,7 +150,7 @@
 
 <style>
 .dashboard-container {
-    max-width: 1000px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
 }
@@ -132,6 +179,21 @@
     color: white;
 }
 
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.btn-success {
+    background: #10b981;
+    color: white;
+}
+
+.btn-danger {
+    background: #ef4444;
+    color: white;
+}
+
 .tasks-header {
     display: flex;
     justify-content: space-between;
@@ -139,10 +201,59 @@
     margin-bottom: 20px;
 }
 
+.header-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+#search-input {
+    padding: 10px 16px;
+    border: 2px solid #e1e1e1;
+    border-radius: 8px;
+    font-size: 1rem;
+    width: 300px;
+}
+
+#search-input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-card h3 {
+    color: #666;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+
+.stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #667eea;
+}
+
 .task-filters {
     display: flex;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 20px;
+    flex-wrap: wrap;
 }
 
 .task-filters select {
@@ -160,34 +271,50 @@
 
 .task-card {
     background: white;
-    padding: 16px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.task-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.task-info {
+    flex: 1;
+    margin-right: 16px;
 }
 
 .task-info h4 {
-    margin-bottom: 4px;
+    margin-bottom: 8px;
+    color: #333;
+    font-size: 1.1rem;
 }
 
 .task-info p {
     color: #666;
     font-size: 0.9rem;
+    line-height: 1.5;
 }
 
 .task-meta {
     display: flex;
     gap: 8px;
-    margin-top: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
 }
 
 .badge {
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 600;
+    text-transform: capitalize;
 }
 
 .badge-high { background: #fee2e2; color: #dc2626; }
@@ -200,19 +327,23 @@
 .task-actions {
     display: flex;
     gap: 8px;
+    align-items: flex-start;
 }
 
 .task-actions button {
     padding: 6px 12px;
     font-size: 0.85rem;
+    border-radius: 6px;
 }
 
 .modal {
     border: none;
     border-radius: 16px;
     padding: 0;
-    max-width: 500px;
+    max-width: 600px;
     width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 .modal::backdrop {
@@ -225,13 +356,20 @@
 
 .modal-content h3 {
     margin-bottom: 20px;
+    color: #333;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
 }
 
 .modal-actions {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-    margin-top: 20px;
+    margin-top: 24px;
 }
 
 .loading {
@@ -244,6 +382,142 @@
     text-align: center;
     padding: 60px 20px;
     color: #666;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.empty-state h3 {
+    color: #667eea;
+    margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+    .dashboard-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .task-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .task-actions {
+        margin-top: 12px;
+        justify-content: flex-end;
+    }
+    
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .header-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    #search-input {
+        width: 100%;
+    }
 }
 </style>
+
+<script>
+document.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.successful) {
+        if (evt.detail.triggeringEvent) {
+            const taskList = document.getElementById('task-list');
+            const statsResponse = fetch('/api/tasks')
+                .then(response => response.json())
+                .then(data => updateDashboardStats(data.tasks));
+        }
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateDashboardStats([]);
+});
+
+function updateDashboardStats(tasks) {
+    const totalTasks = document.getElementById('total-tasks');
+    const todoTasks = document.getElementById('todo-tasks');
+    const progressTasks = document.getElementById('progress-tasks');
+    const doneTasks = document.getElementById('done-tasks');
+    
+    if (totalTasks) totalTasks.textContent = tasks.length;
+    if (todoTasks) todoTasks.textContent = tasks.filter(t => t.status === 'todo').length;
+    if (progressTasks) progressTasks.textContent = tasks.filter(t => t.status === 'in_progress').length;
+    if (doneTasks) doneTasks.textContent = tasks.filter(t => t.status === 'done').length;
+}
+
+function editTask(taskId) {
+    fetch(`/api/tasks/${taskId}`)
+        .then(response => response.json())
+        .then(data => {
+            const task = data.task;
+            const modal = document.getElementById('taskModal');
+            const form = document.getElementById('task-form');
+            
+            document.getElementById('modal-title').textContent = 'Edit Task';
+            document.getElementById('task-id').value = task.id;
+            document.getElementById('modal-title-input').value = task.title;
+            document.getElementById('modal-description').value = task.description;
+            document.getElementById('modal-priority').value = task.priority;
+            document.getElementById('modal-status').value = task.status;
+            
+            if (task.deadline) {
+                const deadline = new Date(task.deadline);
+                const localDeadline = new Date(deadline.getTime() - deadline.getTimezoneOffset() * 60000);
+                document.getElementById('modal-deadline').value = localDeadline.toISOString().slice(0, 16);
+            }
+            
+            form.setAttribute('hx-put', `/api/tasks/${taskId}`);
+            form.setAttribute('hx-target', `#task-${taskId}`);
+            form.setAttribute('hx-swap', 'outerHTML');
+            document.getElementById('modal-submit-btn').textContent = 'Update Task';
+            
+            modal.showModal();
+        })
+        .catch(error => {
+            console.error('Error fetching task:', error);
+        });
+}
+
+function resetTaskModal() {
+    const modal = document.getElementById('taskModal');
+    const form = document.getElementById('task-form');
+    
+    document.getElementById('modal-title').textContent = 'Create New Task';
+    document.getElementById('task-id').value = '';
+    form.reset();
+    form.setAttribute('hx-post', '/api/tasks');
+    form.setAttribute('hx-target', '#task-list');
+    form.setAttribute('hx-swap', 'afterbegin');
+    document.getElementById('modal-submit-btn').textContent = 'Create Task';
+    
+    form.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.successful) {
+            modal.close();
+            resetTaskModal();
+            
+            const taskList = document.getElementById('task-list');
+            if (taskList && taskList.querySelector('.empty-state')) {
+                htmx.trigger('#task-list', 'load');
+            }
+        }
+    });
+}
+
+document.addEventListener('close', function(e) {
+    if (e.target.id === 'taskModal') {
+        resetTaskModal();
+    }
+});
+
+document.getElementById('taskModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        this.close();
+    }
+});
+</script>
 {{end}}
