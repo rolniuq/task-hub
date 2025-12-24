@@ -1,12 +1,13 @@
 module taskhub
 
-go 1.25.1
+go 1.24.0
 
 require (
 	fyne.io/fyne/v2 v2.7.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/lib/pq v1.10.9
 	github.com/nats-io/nats.go v1.46.1
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/fx v1.24.0
