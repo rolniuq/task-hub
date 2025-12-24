@@ -1,0 +1,223 @@
+# GitHub Bot Configuration for Task Hub
+# This file configures various GitHub bots and automation tools
+
+# Dependabot configuration for dependency updates
+version: 2
+updates:
+  # Go modules
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "dependabot[bot]"
+    assignees:
+      - "maintainer"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "go"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "dependabot[bot]"
+    assignees:
+      - "maintainer"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Docker (if you have Dockerfile updates)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "dependabot[bot]"
+    assignees:
+      - "maintainer"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+
+# Security policy configuration
+security:
+  # Automated security fixes
+  vulnerability-alerts:
+    enabled: true
+    
+  # Code scanning alerts
+  code-scanning:
+    enabled: true
+    
+  # Secret scanning
+  secret-scanning:
+    enabled: true
+
+# Issue and PR management automation
+issue_management:
+  # Auto-assign issues
+  auto_assign:
+    enabled: true
+    assignees: ["maintainer"]
+    reviewers: ["maintainer"]
+    
+  # Issue templates
+  templates:
+    bug_report:
+      name: "Bug Report"
+      description: "Report a bug or issue"
+      fields:
+        - type: "textarea"
+          id: "description"
+          label: "Description"
+          required: true
+        - type: "textarea"
+          id: "steps"
+          label: "Steps to reproduce"
+          required: true
+        - type: "textarea"
+          id: "expected"
+          label: "Expected behavior"
+          required: true
+          
+    feature_request:
+      name: "Feature Request"
+      description: "Request a new feature"
+      fields:
+        - type: "textarea"
+          id: "description"
+          label: "Feature description"
+          required: true
+        - type: "textarea"
+          id: "use_case"
+          label: "Use case"
+          required: true
+
+# Pull request automation
+pull_request:
+  # Auto-label PRs
+  auto_label:
+    enabled: true
+    labels:
+      - "pr"
+      
+  # PR size indicator
+  size_indicator:
+    enabled: true
+    thresholds:
+      small: 10
+      medium: 50
+      large: 100
+      
+  # Auto-merge for dependency updates
+  auto_merge:
+    enabled: false  # Set to true if you want auto-merge
+    requirements:
+      - "status-success=lint"
+      - "status-success=test"
+      - "approved-reviews-by=1"
+
+# Release automation
+release:
+  # Automatic releases on main branch
+  auto_release:
+    enabled: true
+    trigger: "push"
+    branch: "main"
+    draft: false
+    
+  # Changelog generation
+  changelog:
+    enabled: true
+    categories:
+      - title: "Features"
+        labels: ["enhancement", "feature"]
+      - title: "Bug Fixes"
+        labels: ["bug", "fix"]
+      - title: "Documentation"
+        labels: ["documentation"]
+      - title: "Dependencies"
+        labels: ["dependencies"]
+        
+# Code quality automation
+code_quality:
+  # Stale issue/PR management
+  stale:
+    enabled: true
+    days_until_stale: 30
+    days_until_close: 7
+    stale_label: "stale"
+    close_label: "closed"
+    exempt_labels: ["pinned", "security"]
+    
+  # Lock closed issues
+  lock:
+    enabled: true
+    days_until_lock: 14
+    exempt_labels: ["security", "pinned"]
+    
+# Communication automation
+communication:
+  # Welcome messages for new contributors
+  welcome:
+    enabled: true
+    message: |
+      👋 Thanks for opening your first issue/pull request in Task Hub!
+      
+      Please make sure you've read our [contributing guidelines](CONTRIBUTING.md).
+      Feel free to ask if you need any help! 🚀
+      
+  # PR review reminders
+  review_reminder:
+    enabled: true
+    delay: "24h"
+    message: |
+      📋 This PR is waiting for review. 
+      Maintainers, please review when you get a chance.
+
+# Project management
+project_management:
+  # Project automation
+  projects:
+    enabled: true
+    
+  # Milestone automation
+  milestones:
+    enabled: true
+    auto_create: true
+    
+# Monitoring and reporting
+monitoring:
+  # Activity reports
+  activity_report:
+    enabled: true
+    schedule: "weekly"
+    channels: ["#team-updates"]
+    
+  # Performance metrics
+  performance:
+    enabled: true
+    metrics:
+      - "build_time"
+      - "test_coverage"
+      - "code_quality"
