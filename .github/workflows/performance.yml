@@ -36,6 +36,19 @@ jobs:
           go build -o bin/web-app ./cmd/main.go
           go build -o bin/desktop-app ./cmd/desktop/main.go
 
+      - name: Create .env file
+        run: |
+          cat <<EOF > .env
+          PORT=8080
+          NATS_URL=nats://localhost:4222
+          JWT_SECRET=test-secret-key
+          DB_HOST=localhost
+          DB_PORT=5432
+          DB_USER=test_user
+          DB_PASSWORD=test_password
+          DB_NAME=test_db
+          EOF
+
       - name: Start services
         run: |
           docker compose up -d db nats
@@ -83,6 +96,22 @@ jobs:
       - name: Build and start application
         run: |
           go build -o bin/web-app ./cmd/main.go
+
+      - name: Create .env file
+        run: |
+          cat <<EOF > .env
+          PORT=8080
+          NATS_URL=nats://localhost:4222
+          JWT_SECRET=test-secret-key
+          DB_HOST=localhost
+          DB_PORT=5432
+          DB_USER=test_user
+          DB_PASSWORD=test_password
+          DB_NAME=test_db
+          EOF
+
+      - name: Start services
+        run: |
           docker compose up -d db nats
           ./bin/web-app &
           sleep 15
@@ -124,6 +153,19 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
+
+      - name: Create .env file
+        run: |
+          cat <<EOF > .env
+          PORT=8080
+          NATS_URL=nats://localhost:4222
+          JWT_SECRET=test-secret-key
+          DB_HOST=localhost
+          DB_PORT=5432
+          DB_USER=test_user
+          DB_PASSWORD=test_password
+          DB_NAME=test_db
+          EOF
 
       - name: Start services
         run: docker compose up -d db nats
