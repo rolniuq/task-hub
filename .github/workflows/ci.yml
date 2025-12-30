@@ -28,7 +28,6 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
           args: --timeout=5m --max-issues-per-linter=50 --max-same-issues=10 || true
 
       - name: Run Gosec Security Scanner
