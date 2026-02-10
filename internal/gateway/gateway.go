@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"taskhub/config"
 	"taskhub/internal/app"
@@ -28,7 +29,6 @@ type Gateway struct {
 	logger         *logger.Logger
 	authHandler    *handler.AuthHandler
 	taskHandler    *handler.TaskHandler
-	webHandler     *handler.WebHandler
 	authMiddleware *middleware.AuthMiddleware
 }
 
@@ -38,24 +38,40 @@ func NewGateway(
 	authService *app.AuthService,
 	taskService *app.TaskService,
 ) *Gateway {
-	webHandler, err := handler.NewWebHandler("web/templates")
-	if err != nil {
-		logger.Error("failed to load templates", "error", err)
-	}
-
 	return &Gateway{
 		config:         config,
 		natsConn:       nats.NewNats(config, logger),
 		logger:         logger,
 		authHandler:    handler.NewAuthHandler(authService),
 		taskHandler:    handler.NewTaskHandler(taskService),
-		webHandler:     webHandler,
 		authMiddleware: middleware.NewAuthMiddleware(authService),
 	}
 }
 
 func healthCheck(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
+}
+
+// spaHandler serves the Vue.js SPA
+type spaHandler struct {
+	staticPath string
+	indexPath  string
+}
+
+func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Get the path
+	urlPath := r.URL.Path
+
+	// Serve static assets directly
+	if strings.HasPrefix(urlPath, "/assets/") || urlPath == "/vite.svg" {
+		// Strip the leading slash and join with static path
+		filePath := filepath.Join(h.staticPath, urlPath)
+		http.ServeFile(w, r, filePath)
+		return
+	}
+
+	// For all other routes, serve index.html (SPA routing)
+	http.ServeFile(w, r, filepath.Join(h.staticPath, h.indexPath))
 }
 
 func (g *Gateway) Start() error {
@@ -65,21 +81,10 @@ func (g *Gateway) Start() error {
 
 	mux := http.NewServeMux()
 
+	// Health check
 	mux.HandleFunc("/health", healthCheck)
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-		http.NotFound(w, r)
-	})
-	mux.HandleFunc("/login", g.webHandler.Login)
-	mux.HandleFunc("/register", g.webHandler.Register)
-	mux.Handle("/dashboard", g.authMiddleware.Authenticate(http.HandlerFunc(g.webHandler.Dashboard)))
-
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
-
+	// API routes
 	mux.HandleFunc("/api/auth/register", g.authHandler.Register)
 	mux.HandleFunc("/api/auth/login", g.authHandler.Login)
 	mux.Handle("/api/auth/refresh", g.authMiddleware.Authenticate(http.HandlerFunc(g.authHandler.RefreshToken)))
@@ -87,6 +92,16 @@ func (g *Gateway) Start() error {
 
 	mux.Handle("/api/tasks", g.authMiddleware.Authenticate(http.HandlerFunc(g.handleTasks)))
 	mux.Handle("/api/tasks/", g.authMiddleware.Authenticate(http.HandlerFunc(g.handleTaskByID)))
+
+	// Serve static assets
+	mux.Handle("/assets/", http.FileServer(http.Dir("web/dist")))
+	mux.HandleFunc("/vite.svg", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/dist/vite.svg")
+	})
+
+	// Serve Vue.js SPA for all other routes
+	spa := spaHandler{staticPath: "web/dist", indexPath: "index.html"}
+	mux.Handle("/", spa)
 
 	g.httpServer = &http.Server{
 		Addr:         fmt.Sprintf(":%s", g.config.Port),

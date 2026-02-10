@@ -1,10 +1,7 @@
 version: "2"
 
-run:
-  timeout: 5m
-
 linters:
-  disable-all: true
+  default: none
   enable:
     - gosec
     - govet
@@ -13,18 +10,19 @@ linters:
     - unused
     - bodyclose
 
-linters-settings:
-  errcheck:
-    check-type-assertions: false
-    check-blank: false
+  settings:
+    errcheck:
+      check-type-assertions: false
+      check-blank: false
+
+  exclusions:
+    rules:
+      # Exclude some linters from running on tests files
+      - path: _test\.go
+        linters:
+          - gosec
+          - staticcheck
 
 issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - gosec
-        - staticcheck
-        
   max-issues-per-linter: 0
   max-same-issues: 0

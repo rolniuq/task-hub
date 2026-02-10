@@ -34,9 +34,9 @@ type Config struct {
 }
 
 func NewConfig() *Config {
-	if err := godotenv.Load(); err != nil {
-		panic(err)
-	}
+	// Load .env file if it exists, but don't panic if it doesn't
+	// (environment variables may already be set via docker-compose env_file)
+	_ = godotenv.Load()
 
 	return &Config{
 		Port:      os.Getenv("PORT"),

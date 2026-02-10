@@ -3,11 +3,10 @@ package repo
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"strings"
 	"taskhub/config"
+	"taskhub/internal/db"
 	"taskhub/internal/domains/task"
-	"taskhub/pkg/db"
+	db2 "taskhub/pkg/db"
 	"taskhub/pkg/logger"
 
 	"github.com/google/uuid"
@@ -20,65 +19,116 @@ var TaskRepositoryModule = fx.Module(
 )
 
 type TaskRepository struct {
-	conn   *sql.DB
-	logger *logger.Logger
+	queries *db.Queries
+	logger  *logger.Logger
 }
 
 func NewTaskRepository(config *config.Config, logger *logger.Logger) *TaskRepository {
-	conn := db.NewDB(config).GetConnection()
+	conn := db2.NewDB(config).GetConnection()
+	queries := db.New(conn)
 	return &TaskRepository{
-		conn:   conn,
-		logger: logger,
+		queries: queries,
+		logger:  logger,
 	}
+}
+
+// Helper function to convert domain Task to sqlc CreateTaskParams
+func toCreateTaskParams(t *task.Task) db.CreateTaskParams {
+	params := db.CreateTaskParams{
+		ID:        t.Id,
+		Title:     t.Title,
+		Status:    string(t.Status),
+		Priority:  string(t.Priority),
+		UserID:    t.UserID,
+		CreatedAt: t.CreatedAt,
+		CreatedBy: t.CreatedBy,
+	}
+
+	if t.Description != "" {
+		params.Description = sql.NullString{String: t.Description, Valid: true}
+	}
+	if t.Deadline != nil {
+		params.Deadline = sql.NullTime{Time: *t.Deadline, Valid: true}
+	}
+
+	return params
+}
+
+// Helper function to convert sqlc Task to domain Task
+func toDomainTask(t db.Task) *task.Task {
+	result := &task.Task{
+		Title:    t.Title,
+		Status:   task.TaskStatus(t.Status),
+		Priority: task.TaskPriority(t.Priority),
+		UserID:   t.UserID,
+	}
+
+	// Set BaseEntity fields
+	result.Id = t.ID
+	result.CreatedAt = t.CreatedAt
+	result.CreatedBy = t.CreatedBy
+
+	if t.Description.Valid {
+		result.Description = t.Description.String
+	}
+	if t.Deadline.Valid {
+		result.Deadline = &t.Deadline.Time
+	}
+	if t.UpdatedAt.Valid {
+		result.UpdateAt = &t.UpdatedAt.Time
+	}
+	if t.UpdatedBy.Valid {
+		result.UpdateBy = &t.UpdatedBy.UUID
+	}
+
+	return result
 }
 
 func (r *TaskRepository) Create(ctx context.Context, t *task.Task) (*task.Task, error) {
-	query := `INSERT INTO tasks (id, title, description, status, priority, deadline, user_id, created_at, created_by)
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
+	params := toCreateTaskParams(t)
 
-	var id uuid.UUID
-	err := r.conn.QueryRowContext(ctx, query,
-		t.Id, t.Title, t.Description, t.Status, t.Priority, t.Deadline, t.UserID, t.CreatedAt, t.CreatedBy,
-	).Scan(&id)
+	created, err := r.queries.CreateTask(ctx, params)
 	if err != nil {
 		return nil, err
 	}
 
-	t.Id = id
-	return t, nil
+	return toDomainTask(created), nil
 }
 
 func (r *TaskRepository) UpdateById(ctx context.Context, id uuid.UUID, t *task.Task) (*task.Task, error) {
-	query := `UPDATE tasks SET title = $1, description = $2, status = $3, priority = $4, deadline = $5, updated_at = $6, updated_by = $7
-              WHERE id = $8`
+	params := db.UpdateTaskParams{
+		ID:       id,
+		Title:    t.Title,
+		Status:   string(t.Status),
+		Priority: string(t.Priority),
+	}
 
-	result, err := r.conn.ExecContext(ctx, query,
-		t.Title, t.Description, t.Status, t.Priority, t.Deadline, t.UpdateAt, t.UpdateBy, id,
-	)
+	if t.Description != "" {
+		params.Description = sql.NullString{String: t.Description, Valid: true}
+	}
+	if t.Deadline != nil {
+		params.Deadline = sql.NullTime{Time: *t.Deadline, Valid: true}
+	}
+	if t.UpdateAt != nil {
+		params.UpdatedAt = sql.NullTime{Time: *t.UpdateAt, Valid: true}
+	}
+	if t.UpdateBy != nil {
+		params.UpdatedBy = uuid.NullUUID{UUID: *t.UpdateBy, Valid: true}
+	}
+
+	updated, err := r.queries.UpdateTask(ctx, params)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, sql.ErrNoRows
+		}
 		return nil, err
 	}
 
-	rowsAffected, _ := result.RowsAffected()
-	if rowsAffected == 0 {
-		return nil, sql.ErrNoRows
-	}
-
-	t.Id = id
-	return t, nil
+	return toDomainTask(updated), nil
 }
 
 func (r *TaskRepository) FindById(ctx context.Context, id uuid.UUID) (*task.Task, error) {
-	query := `SELECT id, title, description, status, priority, deadline, user_id, created_at, created_by, updated_at, updated_by
-              FROM tasks WHERE id = $1 AND deleted_at IS NULL`
-
-	var t task.Task
-	var deadline, updatedAt sql.NullTime
-	var updatedBy sql.NullString
-
-	err := r.conn.QueryRowContext(ctx, query, id).Scan(
-		&t.Id, &t.Title, &t.Description, &t.Status, &t.Priority, &deadline, &t.UserID, &t.CreatedAt, &t.CreatedBy, &updatedAt, &updatedBy,
-	)
+	found, err := r.queries.GetTask(ctx, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -86,114 +136,67 @@ func (r *TaskRepository) FindById(ctx context.Context, id uuid.UUID) (*task.Task
 		return nil, err
 	}
 
-	if deadline.Valid {
-		t.Deadline = &deadline.Time
-	}
-	if updatedAt.Valid {
-		t.UpdateAt = &updatedAt.Time
-	}
-	if updatedBy.Valid {
-		uid, _ := uuid.Parse(updatedBy.String)
-		t.UpdateBy = &uid
-	}
-
-	return &t, nil
+	return toDomainTask(found), nil
 }
 
 func (r *TaskRepository) FindAll(ctx context.Context, filter *task.TaskFilter) ([]*task.Task, error) {
-	query := `SELECT id, title, description, status, priority, deadline, user_id, created_at, created_by, updated_at, updated_by
-              FROM tasks WHERE deleted_at IS NULL`
+	var dbTasks []db.Task
+	var err error
 
-	args := []interface{}{}
-	argIndex := 1
-
+	// sqlc generates specific queries for different filters
+	// We use the most appropriate query based on the filter
 	if filter != nil {
-		conditions := []string{}
-
-		if filter.Status != nil {
-			conditions = append(conditions, fmt.Sprintf("status = $%d", argIndex))
-			args = append(args, *filter.Status)
-			argIndex++
+		switch {
+		case filter.UserID != nil:
+			dbTasks, err = r.queries.ListTasksByUser(ctx, *filter.UserID)
+		case filter.Status != nil:
+			dbTasks, err = r.queries.ListTasksByStatus(ctx, string(*filter.Status))
+		case filter.Priority != nil:
+			dbTasks, err = r.queries.ListTasksByPriority(ctx, string(*filter.Priority))
+		default:
+			dbTasks, err = r.queries.ListTasks(ctx)
 		}
-
-		if filter.Priority != nil {
-			conditions = append(conditions, fmt.Sprintf("priority = $%d", argIndex))
-			args = append(args, *filter.Priority)
-			argIndex++
-		}
-
-		if filter.UserID != nil {
-			conditions = append(conditions, fmt.Sprintf("user_id = $%d", argIndex))
-			args = append(args, *filter.UserID)
-			argIndex++
-		}
-
-		if filter.Deadline != nil {
-			conditions = append(conditions, fmt.Sprintf("deadline <= $%d", argIndex))
-			args = append(args, *filter.Deadline)
-			argIndex++
-		}
-
-		if len(conditions) > 0 {
-			query += " AND " + strings.Join(conditions, " AND ")
-		}
+	} else {
+		dbTasks, err = r.queries.ListTasks(ctx)
 	}
 
-	query += " ORDER BY created_at DESC"
-
-	rows, err := r.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var tasks []*task.Task
-	for rows.Next() {
-		var t task.Task
-		var deadline, updatedAt sql.NullTime
-		var updatedBy sql.NullString
-
-		err := rows.Scan(
-			&t.Id, &t.Title, &t.Description, &t.Status, &t.Priority, &deadline, &t.UserID, &t.CreatedAt, &t.CreatedBy, &updatedAt, &updatedBy,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		if deadline.Valid {
-			t.Deadline = &deadline.Time
-		}
-		if updatedAt.Valid {
-			t.UpdateAt = &updatedAt.Time
-		}
-		if updatedBy.Valid {
-			uid, _ := uuid.Parse(updatedBy.String)
-			t.UpdateBy = &uid
-		}
-
-		tasks = append(tasks, &t)
+	tasks := make([]*task.Task, len(dbTasks))
+	for i, t := range dbTasks {
+		tasks[i] = toDomainTask(t)
 	}
 
 	return tasks, nil
 }
 
 func (r *TaskRepository) FindByUserId(ctx context.Context, userID uuid.UUID, filter *task.TaskFilter) ([]*task.Task, error) {
-	if filter == nil {
-		filter = &task.TaskFilter{}
+	dbTasks, err := r.queries.ListTasksByUser(ctx, userID)
+	if err != nil {
+		return nil, err
 	}
-	filter.UserID = &userID
-	return r.FindAll(ctx, filter)
+
+	tasks := make([]*task.Task, len(dbTasks))
+	for i, t := range dbTasks {
+		tasks[i] = toDomainTask(t)
+	}
+
+	return tasks, nil
 }
 
 func (r *TaskRepository) DeleteById(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
-	query := `UPDATE tasks SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2`
+	params := db.DeleteTaskParams{
+		ID:        id,
+		DeletedBy: uuid.NullUUID{UUID: userID, Valid: true},
+	}
 
-	result, err := r.conn.ExecContext(ctx, query, userID, id)
+	rowsAffected, err := r.queries.DeleteTask(ctx, params)
 	if err != nil {
 		return err
 	}
 
-	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
 		return sql.ErrNoRows
 	}
@@ -202,14 +205,16 @@ func (r *TaskRepository) DeleteById(ctx context.Context, id uuid.UUID, userID uu
 }
 
 func (r *TaskRepository) MarkAsCompleted(ctx context.Context, id uuid.UUID, userID uuid.UUID) error {
-	query := `UPDATE tasks SET status = $1, updated_at = NOW(), updated_by = $2 WHERE id = $3`
+	params := db.MarkTaskAsCompletedParams{
+		ID:        id,
+		UpdatedBy: uuid.NullUUID{UUID: userID, Valid: true},
+	}
 
-	result, err := r.conn.ExecContext(ctx, query, task.StatusDone, userID, id)
+	rowsAffected, err := r.queries.MarkTaskAsCompleted(ctx, params)
 	if err != nil {
 		return err
 	}
 
-	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
 		return sql.ErrNoRows
 	}
@@ -218,45 +223,14 @@ func (r *TaskRepository) MarkAsCompleted(ctx context.Context, id uuid.UUID, user
 }
 
 func (r *TaskRepository) FindTasksNearDeadline(ctx context.Context, hoursAhead int) ([]*task.Task, error) {
-	query := `SELECT id, title, description, status, priority, deadline, user_id, created_at, created_by, updated_at, updated_by
-              FROM tasks
-              WHERE deleted_at IS NULL
-              AND status != $1
-              AND deadline IS NOT NULL
-              AND deadline <= NOW() + INTERVAL '1 hour' * $2
-              ORDER BY deadline ASC`
-
-	rows, err := r.conn.QueryContext(ctx, query, task.StatusDone, hoursAhead)
+	dbTasks, err := r.queries.GetTasksNearDeadline(ctx, hoursAhead)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var tasks []*task.Task
-	for rows.Next() {
-		var t task.Task
-		var deadline, updatedAt sql.NullTime
-		var updatedBy sql.NullString
-
-		err := rows.Scan(
-			&t.Id, &t.Title, &t.Description, &t.Status, &t.Priority, &deadline, &t.UserID, &t.CreatedAt, &t.CreatedBy, &updatedAt, &updatedBy,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		if deadline.Valid {
-			t.Deadline = &deadline.Time
-		}
-		if updatedAt.Valid {
-			t.UpdateAt = &updatedAt.Time
-		}
-		if updatedBy.Valid {
-			uid, _ := uuid.Parse(updatedBy.String)
-			t.UpdateBy = &uid
-		}
-
-		tasks = append(tasks, &t)
+	tasks := make([]*task.Task, len(dbTasks))
+	for i, t := range dbTasks {
+		tasks[i] = toDomainTask(t)
 	}
 
 	return tasks, nil

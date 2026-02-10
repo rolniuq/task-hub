@@ -32,7 +32,10 @@ func (t *CustomTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant)
 	case theme.ColorNameDisabled:
 		return color.RGBA{R: 148, G: 163, B: 184, A: 255} // Gray disabled
 	case theme.ColorNameInputBackground:
-		return color.RGBA{R: 255, G: 255, B: 255, A: 255} // White input
+		if variant == theme.VariantDark {
+			return color.RGBA{R: 30, G: 41, B: 59, A: 255} // Dark slate input for dark mode
+		}
+		return color.RGBA{R: 255, G: 255, B: 255, A: 255} // White input for light mode
 	default:
 		return theme.DefaultTheme().Color(name, variant)
 	}

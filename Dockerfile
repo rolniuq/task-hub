@@ -1,3 +1,15 @@
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /frontend
+
+COPY web/frontend/package*.json ./
+
+RUN npm ci
+
+COPY web/frontend/ .
+
+RUN npm run build
+
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
@@ -17,8 +29,8 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /root/
 
 COPY --from=builder /app/task-hub .
+COPY --from=frontend-builder /frontend/dist ./web/dist
 
 EXPOSE 8080
 
 CMD ["./task-hub"]
-
