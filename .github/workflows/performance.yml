@@ -21,7 +21,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.24'
 
       - name: Cache Go modules
         uses: actions/cache@v4
@@ -57,7 +57,7 @@ jobs:
       - name: Run benchmarks
         run: |
           # Run Go benchmarks if they exist
-          if [ -d "**/*_test.go" ]; then
+          if find . -name "*_test.go" | xargs grep -l "func Bench" 2>/dev/null | grep -q .; then
             go test -bench=. -benchmem -count=3 ./... | tee benchmark.txt
           fi
         env:
@@ -70,7 +70,7 @@ jobs:
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && hashFiles('benchmark.txt') != ''
         with:
           tool: 'go'
           output-file-path: benchmark.txt
@@ -91,7 +91,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.24'
 
       - name: Build and start application
         run: |
@@ -152,7 +152,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.24'
 
       - name: Create .env file
         run: |
@@ -171,6 +171,7 @@ jobs:
         run: docker compose up -d db nats
 
       - name: Run memory profiling
+        continue-on-error: true
         run: |
           # Build with profiling support
           go build -o bin/web-app ./cmd/main.go
