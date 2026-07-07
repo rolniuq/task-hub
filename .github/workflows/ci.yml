@@ -87,6 +87,9 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      - name: Install system dependencies (Fyne/desktop)
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev
+
       - name: Run unit tests
         run: go test -v -race -coverprofile=coverage.out ./... || true
         env:
@@ -154,6 +157,9 @@ jobs:
         run: |
           mkdir -p bin
           go build -o bin/web-app ./cmd/main.go
+
+      - name: Install desktop build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev
 
       - name: Build desktop application
         run: |
