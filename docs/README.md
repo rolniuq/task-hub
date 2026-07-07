@@ -1,6 +1,6 @@
 # TaskHub - Modern Task Management System
 
-[![Go Version](https://img.shields.io/badge/Go-1.25+-blue.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-blue.svg)](https://golang.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-blue.svg)](https://www.postgresql.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -8,7 +8,7 @@ TaskHub is a modern, high-performance task management system built with Go, feat
 
 ## ✨ Key Features
 
-- **🚀 High Performance**: Built with Go 1.25+ and optimized for speed
+- **🚀 High Performance**: Built with Go 1.24+ and optimized for speed
 - **🏗️ Clean Architecture**: Domain-driven design with clear separation of concerns
 - **🔐 Secure Authentication**: JWT-based auth with refresh tokens
 - **📱 Responsive UI**: Modern web interface with HTMX for seamless interactions
@@ -50,7 +50,7 @@ TaskHub follows **Clean Architecture** principles with **Domain-Driven Design**:
 
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.24+
 - PostgreSQL 16+
 - Docker & Docker Compose (optional)
 - NATS Server (included in Docker Compose)
@@ -63,7 +63,7 @@ git clone https://github.com/your-org/task-hub.git
 cd task-hub
 
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # The application will be available at http://localhost:8080
 ```
@@ -78,12 +78,17 @@ cd task-hub
 # Install dependencies
 go mod download
 
-# Set up environment
-cp .env.example .env
-# Edit .env with your database configuration
-
-# Run database migrations
-go run cmd/migrate/main.go
+# Create .env file (required)
+cat > .env << EOF
+PORT=8080
+NATS_URL=nats://localhost:4222
+JWT_SECRET=your_jwt_secret_key_at_least_32_characters
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=taskhub
+DB_PASSWORD=dev_password
+DB_NAME=taskhub
+EOF
 
 # Start the application
 go run cmd/main.go
@@ -93,7 +98,7 @@ go run cmd/main.go
 
 | Component | Technology | Version |
 |-----------|------------|---------|
-| **Backend** | Go | 1.25+ |
+| **Backend** | Go | 1.24+ |
 | **Database** | PostgreSQL | 16+ |
 | **Messaging** | NATS | Latest |
 | **Authentication** | JWT | v5 |
@@ -114,6 +119,9 @@ go run cmd/main.go
 TaskHub uses environment variables for configuration. Key settings:
 
 ```bash
+# Server
+PORT=8080
+
 # Database
 DB_HOST=localhost
 DB_PORT=5432
@@ -121,14 +129,8 @@ DB_USER=taskhub
 DB_PASSWORD=your_password
 DB_NAME=taskhub
 
-# JWT
-JWT_SECRET=your_jwt_secret_key
-JWT_ACCESS_TOKEN_DURATION=15m
-JWT_REFRESH_TOKEN_DURATION=168h
-
-# Server
-SERVER_PORT=8080
-SERVER_HOST=0.0.0.0
+# Authentication
+JWT_SECRET=your_jwt_secret_key_at_least_32_characters
 
 # NATS
 NATS_URL=nats://localhost:4222
@@ -146,8 +148,8 @@ go test -cover ./...
 # Run specific package tests
 go test ./internal/domains/task/...
 
-# Run integration tests
-go test -tags=integration ./...
+# Run tests with race detection
+go test -race ./...
 ```
 
 ## 📝 API Usage Examples

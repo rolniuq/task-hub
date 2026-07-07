@@ -64,9 +64,4 @@ func (t *Task) MarkAsCompleted(userID uuid.UUID) {
 	t.UpdateBy = &userID
 }
 
-func (t *Task) MarkAsInProgress(userID uuid.UUID) {
-	now := time.Now()
-	t.Status = StatusInProgress
-	t.UpdateAt = &now
-	t.UpdateBy = &userID
-}
+
