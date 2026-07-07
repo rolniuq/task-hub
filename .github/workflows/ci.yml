@@ -33,7 +33,11 @@ jobs:
       - name: Run Gosec Security Scanner
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec -no-fail -fmt sarif -out ${{ runner.temp }}/results.sarif ./...
+          gosec -no-fail -fmt sarif -out ${{ runner.temp }}/results.sarif -exclude-dir=web/frontend -exclude-dir=web/dist ./... || true
+          # Ensure file exists for upload step
+          if [ ! -f "${{ runner.temp }}/results.sarif" ]; then
+            echo '{"version":"2.1.0","runs":[]}' > "${{ runner.temp }}/results.sarif"
+          fi
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3

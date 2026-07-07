@@ -1,9 +1,7 @@
 run:
   timeout: 5m
 
-
 linters:
-  default: none
   enable:
     - gosec
     - govet
@@ -12,19 +10,19 @@ linters:
     - unused
     - bodyclose
 
-  settings:
-    errcheck:
-      check-type-assertions: false
-      check-blank: false
-
-  exclusions:
-    rules:
-      # Exclude some linters from running on tests files
-      - path: _test\.go
-        linters:
-          - gosec
-          - staticcheck
+linters-settings:
+  errcheck:
+    check-type-assertions: false
+    check-blank: false
 
 issues:
+  exclude-dirs:
+    - web/dist
+    - web/frontend
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gosec
+        - staticcheck
   max-issues-per-linter: 0
   max-same-issues: 0
