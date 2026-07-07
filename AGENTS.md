@@ -1,344 +1,318 @@
-# AGENTS.md - TaskHub Development Guide for AI Agents
+# AGENTS.md — Task Hub Rules for AI Agents
 
-## Build, Lint, and Test Commands
+This file defines how AI agents should understand, navigate, and modify the Task Hub project.
 
-### Go Backend Commands
-```bash
-# Build commands
-go build ./cmd/main.go                    # Build web server
-go build ./cmd/desktop/main.go            # Build desktop app
+---
 
-# Test commands
-go test ./...                              # Run all tests
-go test ./internal/handler/...             # Run specific package tests
-go test -v ./...                           # Run tests with verbose output
-go test -cover ./...                       # Run tests with coverage
-go test -race ./...                        # Run tests with race detection
-go test -run TestTaskService_CreateTask    # Run single test by name
+## 1. Project Identity
 
-# Linting and formatting
-golangci-lint run                          # Run linter
-go fmt ./...                               # Format Go code
-goimports -w .                             # Organize imports
+| Attribute | Value |
+|-----------|-------|
+| **Name** | Task Hub |
+| **Module** | `taskhub` (Go module) |
+| **Go version** | `1.24.0` (`go.mod`) |
+| **Repo** | `github.com/rolniuq/task-hub` |
+| **Description** | Task management app: web (Go + HTMX) + desktop (Fyne v2) + PostgreSQL + NATS |
 
-# Development tools
-go mod download                            # Download dependencies
-go mod tidy                                # Clean up dependencies
-air                                        # Hot reload (if installed)
+## 2. Documentation Map
+
+| File | Purpose | Audience |
+|------|---------|----------|
+| `AGENTS.md` | Rules & quick reference for AI agents | AI agents |
+| `CONTEXT.md` | Deep architecture, data flow, known issues | Developers & AI |
+| `README.md` | Project overview, quick start | End users |
+| `docs/README.md` | Secondary overview (needs cleanup) | End users |
+| `docs/API.md` | API documentation (aspirational — does NOT match actual code) | API consumers |
+| `docs/ARCHITECTURE.md` | Architecture docs (aspirational — does NOT match actual code) | Architects |
+| `docs/DEVELOPMENT.md` | Development guide (aspirational — does NOT match actual code) | Developers |
+| `docs/DEPLOYMENT.md` | Deployment guide (aspirational — does NOT match actual code) | DevOps |
+| `docs/CONTRIBUTING.md` | Contribution guide (aspirational — does NOT match actual code) | Contributors |
+| `install.sh` | macOS installer script | End users |
+
+> **⚠️ CRITICAL**: The files in `docs/` are **aspirational** — they describe what the project *could become*, not what it *currently is*. Always verify against the actual code in `internal/`, `pkg/`, `cmd/`, and `config/`. The **source of truth** is the codebase itself.
+
+## 3. Architecture Rules
+
+### 3.1 Layer Rules
+
+```
+cmd/          → Entry points (thin — only FX wiring)
+internal/
+  app/        → Business logic services
+  desktop/    → Fyne UI (desktop only)
+  domains/    → Domain models + repository implementations
+  gateway/    → HTTP server, routing, middleware setup
+  handler/    → HTTP handlers (JSON + HTMX dual responses)
+pkg/          → Reusable infrastructure code
+config/       → Config loading from env vars
+web/          → Static assets + HTML templates
 ```
 
-### Frontend Commands (Vue.js)
-```bash
-cd web/frontend
-npm install                                # Install dependencies
-npm run dev                                # Start development server
-npm run build                              # Build for production
-npm run preview                            # Preview production build
-```
+**Rules:**
+- `cmd/` files must ONLY wire FX modules and call `fx.Invoke` — no business logic
+- `internal/app/` services must NOT import `net/http`, `handler`, `gateway`, or `desktop`
+- `internal/domains/` must NOT import `internal/app/` or `internal/handler/` or `internal/gateway/`
+- `pkg/` must NOT import any `internal/` packages
+- `internal/handler/` must ONLY depend on `internal/app/` services, never on `internal/domains/` directly
 
-### Docker Commands
-```bash
-task build                                 # Build Docker image
-task run                                   # Run with Docker Compose
-task run-desktop                           # Run desktop with Docker services
-task down                                  # Stop all services
-task clean                                 # Clean Docker resources
-```
+### 3.2 FX Module Naming Convention
 
-## Code Style Guidelines
-
-### Go Code Style
-
-#### Imports Organization
+Every module follows this pattern:
 ```go
-// Standard library imports
-import (
-    "context"
-    "encoding/json"
-    "net/http"
-    "time"
-)
-
-// Third-party imports
-import (
-    "github.com/google/uuid"
-    "github.com/stretchr/testify/assert"
-    "go.uber.org/fx"
-)
-
-// Internal imports
-import (
-    "taskhub/internal/app"
-    "taskhub/internal/domains/task"
-    "taskhub/pkg/logger"
-)
+var XxxModule = fx.Module("xxx", fx.Provide(NewXxx))
 ```
 
-#### Naming Conventions
-- **Packages**: Short, lowercase (`user`, `task`, `auth`)
-- **Exported types**: PascalCase (`UserService`, `TaskRepository`)
-- **Local variables**: camelCase (`userService`, `taskRepository`)
-- **Constants**: UPPER_SNAKE_CASE (`STATUS_TODO`, `PRIORITY_HIGH`)
-- **Interfaces**: Suffix with interface purpose (`Repository`, `Service`, `Handler`)
+| Module variable | Package | Provides |
+|----------------|---------|----------|
+| `config.ConfigModule` | `config` | `*config.Config` |
+| `logger.LoggerModule` | `pkg/logger` | `*logger.Logger` |
+| `userrepo.UserRepositoryModule` | `internal/domains/user/repo` | `*repo.UserRepository` |
+| `taskrepo.TaskRepositoryModule` | `internal/domains/task/repo` | `*repo.TaskRepository` |
+| `app.AuthServiceModule` | `internal/app` | `*app.AuthService` |
+| `app.TaskServiceModule` | `internal/app` | `*app.TaskService` |
+| `nats.NatsModule` | `pkg/nats` | `*nats.Nats` |
+| `gateway.GatewayModule` | `internal/gateway` | `*gateway.Gateway` |
 
-#### Error Handling
+**All modules listed are actively wired.** `UserServiceModule`, `NotificationServiceModule`, and the entire `internal/domains/notification/` directory were removed as unused code.
+
+### 3.3 Adding a New Feature
+
+To add a new domain entity (e.g. "Comment"):
+
+```
+Step 1: internal/domains/comment/comment.go         — entity + interfaces
+Step 2: internal/domains/comment/repo/comment.go     — SQL repository
+Step 3: internal/app/comment_service.go              — business logic + FX module
+Step 4: internal/handler/comment_handler.go          — HTTP handlers
+Step 5: internal/gateway/gateway.go                  — register routes
+Step 6: cmd/main.go                                  — wire new FX module
+Step 7: .init/01-init.sql                            — add DDL
+Step 8: internal/domains/comment/comment_test.go     — tests
+Step 9: internal/handler/comment_handler_test.go     — handler tests
+```
+
+## 4. Coding Rules
+
+### 4.1 HTMX Dual Response Pattern
+
+ALL handlers must check `HX-Request` header and return appropriate responses:
+
 ```go
-// Always handle errors immediately
-user, err := userRepo.GetByID(ctx, userID)
-if err != nil {
-    return nil, fmt.Errorf("failed to get user: %w", err)
-}
+func (h *XxxHandler) DoSomething(w http.ResponseWriter, r *http.Request) {
+    isHTMX := r.Header.Get("HX-Request") == "true"
 
-// Wrap errors with context
-func (s *TaskService) CreateTask(ctx context.Context, req *CreateTaskRequest) (*Task, error) {
-    if err := req.Validate(); err != nil {
-        return nil, fmt.Errorf("invalid request: %w", err)
+    if isHTMX {
+        // 1. Read form values (not JSON)
+        // 2. Return HTML snippet
+        // 3. Use HX-Redirect for navigation
+        // 4. Use HX-Trigger for events
+    } else {
+        // 1. Read JSON body
+        // 2. Return JSON response
+        // 3. Return standard HTTP status codes
     }
-    // ...
 }
 ```
 
-#### Function Structure
+Helper functions (in `internal/handler/auth_handler.go`):
+- `writeJSON(w, status, data)` — JSON response
+- `writeError(w, status, message)` — JSON error
+- `writeHTMXError(w, message)` — HTML error alert
+- `writeHTMXSuccess(w, message, redirectURL)` — HTML success + optional redirect
+
+### 4.2 Error Handling
+
+Use sentinel errors defined as package-level vars:
+
 ```go
-// Document all exported functions
-// CreateUser creates a new user with the given request data.
-// It validates the request, hashes the password, and stores the user.
-// Returns the created user without sensitive information.
-func (s *UserService) CreateUser(ctx context.Context, req *CreateUserRequest) (*User, error) {
-    // Implementation
+// Define in service package
+var ErrXxx = errors.New("xxx error")
+
+// Check with == (not errors.Is)
+if err == app.ErrXxx { ... }
+```
+
+**Do NOT** use `errors.Is()` or `errors.As()` — the codebase uses `==` comparison everywhere.
+
+### 4.3 Database Access Pattern
+
+```go
+// Repository reads config and creates its own DB connection
+func NewXxxRepository(config *config.Config, logger *logger.Logger) *XxxRepository {
+    conn := db.NewDB(config).GetConnection()
+    return &XxxRepository{conn: conn, logger: logger}
 }
 ```
 
-#### Interface Design
+**Rules:**
+- Repositories create their own DB connections via `db.NewDB(config).GetConnection()`
+- Soft-deleted records: always check `WHERE deleted_at IS NULL`
+- UUID primary keys, no auto-increment
+- Use `sql.NullTime` / `sql.NullString` for nullable columns
+
+### 4.4 Auth Middleware Pattern
+
 ```go
-// Define interfaces in the client package
-type TaskRepository interface {
-    Create(ctx context.Context, task *Task) error
-    GetByID(ctx context.Context, id uuid.UUID) (*Task, error)
-    Update(ctx context.Context, task *Task) error
-    Delete(ctx context.Context, id uuid.UUID) error
-}
-```
-
-### Frontend Code Style (Vue.js)
-
-#### Component Structure
-```vue
-<template>
-  <!-- Component template -->
-</template>
-
-<script setup>
-// Component logic with Composition API
-import { ref, computed } from 'vue'
-
-// Reactive state
-const tasks = ref([])
-const loading = ref(false)
-
-// Computed properties
-const completedTasks = computed(() => tasks.value.filter(t => t.completed))
-</script>
-
-<style scoped>
-/* Component-specific styles */
-</style>
-```
-
-#### Naming Conventions
-- **Components**: PascalCase (`TaskList.vue`, `UserProfile.vue`)
-- **Composables**: camelCase starting with "use" (`useAuth.js`, `useTasks.js`)
-- **Props**: camelCase (`taskId`, `userName`)
-- **Events**: kebab-case (`task-created`, `user-updated`)
-- **CSS classes**: kebab-case (`task-list`, `user-profile`)
-
-### Database Code Style
-
-#### SQL Migrations
-```sql
--- migrations/001_create_users_table.sql
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    deleted_at TIMESTAMP WITH TIME ZONE,
-    deleted_by UUID
-);
-```
-
-#### SQLC Configuration
-- Use camelCase for JSON tags
-- Map UUID types to `github.com/google/uuid.UUID`
-- Map timestamp types to `time.Time`
-- Use interfaces for generated code
-
-## Project Structure Conventions
-
-### Directory Structure
-```
-task-hub/
-├── cmd/                    # Application entry points
-│   ├── main.go            # Web server
-│   └── desktop/           # Desktop application
-├── internal/              # Private application code
-│   ├── app/               # Business logic services
-│   ├── domains/           # Domain models and repositories
-│   ├── handler/           # HTTP handlers
-│   └── desktop/           # Desktop UI components
-├── pkg/                   # Public library code
-│   ├── logger/            # Logging utilities
-│   ├── middleware/        # HTTP middleware
-│   └── utils/             # Common utilities
-├── web/                   # Frontend assets
-│   ├── frontend/          # Vue.js application
-│   ├── static/            # Static assets
-│   └── templates/         # Server-side templates
-└── config/                # Configuration
-```
-
-### Module Organization
-- Use `fx` dependency injection framework
-- Organize by domain (user, task, notification)
-- Separate interfaces from implementations
-- Keep handlers thin, logic in services
-
-## Testing Patterns
-
-### Unit Tests
-```go
-func TestTaskService_CreateTask(t *testing.T) {
-    // Arrange
-    mockRepo := &MockTaskRepository{}
-    service := NewTaskService(mockRepo, nil, nil)
-    
-    // Act
-    task, err := service.CreateTask(context.Background(), req, userID)
-    
-    // Assert
-    assert.NoError(t, err)
-    assert.Equal(t, expectedTitle, task.Title)
-}
-```
-
-### Integration Tests
-```go
-func TestTaskHandler_CreateTask_Integration(t *testing.T) {
-    // Setup test database and server
-    // Create test user and authenticate
-    // Make HTTP request and verify response
-}
-```
-
-### Test Utilities
-- Use `testify/assert` for assertions
-- Create test helpers in `tests/` package
-- Use table-driven tests for multiple scenarios
-- Mock external dependencies
-
-## Common Development Tasks
-
-### Adding New API Endpoint
-1. Create request/response models
-2. Add handler method
-3. Register route in main.go
-4. Write tests
-5. Update documentation
-
-### Adding New Domain Entity
-1. Create domain model in `internal/domains/`
-2. Create repository interface
-3. Implement repository
-4. Create service in `internal/app/`
-5. Create handler in `internal/handler/`
-6. Write tests
-
-### Database Schema Changes
-1. Create migration with Goose
-2. Update domain models
-3. Update repositories
-4. Update services if needed
-5. Test with existing data
-
-## Error Handling Best Practices
-
-### HTTP Error Responses
-```go
-func writeError(w http.ResponseWriter, status int, message string) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
-    json.NewEncoder(w).Encode(map[string]interface{}{
-        "success": false,
-        "error":   message,
+// middleware/auth.go
+func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // ONLY checks Authorization: Bearer <token> header
+        // Does NOT read cookies!
+        // Injects user_id + email into context
     })
 }
+
+// Extract user info:
+userID := middleware.GetUserIDFromContext(r.Context())
+email := middleware.GetEmailFromContext(r.Context())
 ```
 
-### Service Layer Errors
-- Return wrapped errors with context
-- Use custom error types for specific cases
-- Log errors with appropriate levels
-- Don't expose internal errors to clients
+### 4.5 Task Ownership Check
 
-## Security Guidelines
+Every task operation must check ownership server-side:
 
-### Authentication
-- Use JWT tokens for API authentication
-- Validate tokens in middleware
-- Use bcrypt for password hashing
-- Implement token refresh mechanism
+```go
+if existingTask.UserID != userID {
+    return nil, app.ErrUnauthorized
+}
+```
 
-### Input Validation
-- Validate all user inputs
-- Use struct tags for validation
-- Sanitize data before storage
-- Implement rate limiting
+### 4.6 Soft Delete
 
-### Database Security
-- Use parameterized queries
-- Implement proper access controls
-- Encrypt sensitive data
-- Use connection pooling
+Tasks use soft delete. The `DELETE` endpoint runs:
+```sql
+UPDATE tasks SET deleted_at = NOW(), deleted_by = $1 WHERE id = $2
+```
 
-## Performance Considerations
+All SELECT queries on tasks include: `WHERE deleted_at IS NULL`
 
-### Database Optimization
-- Use indexes on frequently queried columns
-- Implement connection pooling
-- Use prepared statements
-- Monitor query performance
+### 4.7 Password Handling
 
-### Caching Strategy
-- Cache frequently accessed data
-- Use appropriate cache expiration
-- Implement cache invalidation
-- Monitor cache hit rates
+Passwords are bcrypt-hashed. The `Password` field is cleared (set to `""`) before returning user data in any response.
 
-### API Performance
-- Implement pagination for list endpoints
-- Use appropriate HTTP status codes
-- Compress responses when possible
-- Monitor response times
+## 5. Key Gaps & Pitfalls
 
-## Environment Configuration
+### Known Issues to NEVER introduce by accident:
 
-### Required Environment Variables
+1. **Go version**: Must stay `1.24.0` — Dockerfiles may say `1.25-alpine` but go.mod is `1.24.0`
+2. **Config key**: `PORT` env var, NOT `SERVER_PORT`
+3. **`.env` required**: `godotenv.Load()` panics if `.env` missing
+4. **Cookie auth gap**: AuthMiddleware only reads `Authorization: Bearer` header, NOT cookies. HTMX pages set cookies but can't authenticate from them — fix this before adding cookie-based features
+5. **Field naming**: `BaseEntity.UpdateAt` (not `UpdatedAt`) — this is inconsistent with SQL column `updated_at`
+6. **NotificationService not wired**: The event publishing code exists but is never called. TaskService doesn't publish events
+7. **UserServiceModule unused**: Defined but never imported
+8. **Docker Go version**: Dockerfile uses `golang:1.25-alpine` while go.mod says `1.24.0` — works (1.25 builds 1.24 code) but inconsistent
+9. **Search is in-memory**: `ListTasks` does text search client-side after fetching all tasks, not at DB level
+10. **No graceful shutdown**: No OS signal handling (SIGINT/SIGTERM) in web or desktop app
+
+## 6. Testing Rules
+
 ```bash
-APP_ENV=development
-SERVER_PORT=8080
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=taskhub
-DB_PASSWORD=dev_password
-DB_NAME=taskhub
-JWT_SECRET=your_jwt_secret
-NATS_URL=nats://localhost:4222
+# Run all tests
+go test ./...
+
+# With coverage
+go test -cover ./...
+
+# Specific test
+go test -v -run TestXxx ./internal/app/
+
+# Race detection
+go test -race ./...
 ```
 
-### Development vs Production
-- Use different log levels (debug vs info)
-- Enable hot reloading in development
-- Use different database configurations
-- Implement proper error reporting in production
+- Use `testify/assert` for assertions
+- No mock framework (gomock/mockery) — use simple stubs or real implementations
+- Tests use real services, not mocked interfaces
+- Integration tests (build tag `integration`) connect to real PostgreSQL/NATS
+
+## 7. Environment Variables
+
+| Env Var | Required | Used In |
+|---------|----------|---------|
+| `PORT` | Yes | `config.go` → Gateway HTTP server |
+| `NATS_URL` | Yes | `config.go` → NATS connection |
+| `JWT_SECRET` | Yes | `config.go` → JWT signing/validation |
+| `DB_HOST` | Yes | `config.go` → Postgres DSN |
+| `DB_PORT` | Yes | `config.go` → Postgres DSN |
+| `DB_USER` | Yes | `config.go` → Postgres DSN |
+| `DB_PASSWORD` | Yes | `config.go` → Postgres DSN |
+| `DB_NAME` | Yes | `config.go` → Postgres DSN |
+
+Hardcoded config: `ReadTimeout=15s`, `WriteTimeout=15s`, `IdleTimeout=60s`
+
+## 8. Common File Editing Patterns
+
+### Add a route
+```go
+// internal/gateway/gateway.go — in Start() method
+mux.HandleFunc("/api/foo", g.myHandler.HandleFoo)                 // no auth
+mux.Handle("/api/foo", g.authMiddleware.Authenticate(...))         // with auth
+mux.Handle("/api/foo/", g.authMiddleware.Authenticate(...))        // with sub-paths
+```
+
+### Add a new FX module
+```go
+// 1. Define module + provider
+var MyModule = fx.Module("my", fx.Provide(NewMyService))
+
+// 2. Wire in cmd/main.go
+app.MyModule,
+```
+
+### Add a NATS subject
+```go
+// In internal/app/notification_service.go
+const SubjectXxx = "xxx.event"
+
+// Publish
+func (s *NotificationService) PublishXxx(...) error {
+    return s.nats.Publish(SubjectXxx, data)
+}
+```
+
+## 9. Desktop App Specifics
+
+- Uses Fyne v2 (`fyne.io/fyne/v2`)
+- CustomTheme with indigo primary (`#6366F1`)
+- Icon generated programmatically (see `internal/desktop/icon.go`)
+- Runs natively (not in Docker) on macOS — needs GUI
+- Services (DB, NATS) run in Docker, app runs natively
+- `task run-desktop` → `docker compose up -d db nats` + `go run cmd/desktop/main.go`
+
+## 10. Workflow & CI Rules
+
+- GitHub Actions in `.github/workflows/`
+- CI: lint → test → build → docker → security scan → release → deploy
+- `golangci-lint` config in `.golangci.yml` (no `version` field — incompatible with v1.64+)
+- Go version in workflows must match `go.mod`: `'1.24'`
+- Gosec SARIF output goes to `${{ runner.temp }}/results.sarif`
+
+## 11. Quick Reference Commands
+
+```bash
+# Build
+go build -o task-hub ./cmd/main.go
+go build -o task-hub-desktop ./cmd/desktop/main.go
+
+# Test
+go test ./...
+go test -race ./...
+go test -cover ./...
+go test -v -run TestAuthService ./internal/app/
+
+# Run (dev)
+docker compose up -d db nats   # start dependencies
+go run cmd/main.go              # web app
+go run cmd/desktop/main.go      # desktop app
+
+# Taskfile
+task run-web        # docker compose up -d
+task run-desktop    # docker compose up -d db nats + go run desktop
+task build          # docker build
+task clean          # docker compose down -v --remove-orphans
+
+# Docker
+docker compose up -d
+docker compose down -v --remove-orphans
+```

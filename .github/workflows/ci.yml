@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 env:
-  GO_VERSION: '1.21'
+  GO_VERSION: '1.24'
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -31,15 +31,15 @@ jobs:
           args: --timeout=5m --max-issues-per-linter=50 --max-same-issues=10 || true
 
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
-        with:
-          args: '-no-fail -fmt sarif -out results.sarif ./...'
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec -no-fail -fmt sarif -out ${{ runner.temp }}/results.sarif ./...
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: results.sarif
+          sarif_file: ${{ runner.temp }}/results.sarif
 
   # Testing
   test:
@@ -64,11 +64,6 @@ jobs:
         image: nats:2.9-alpine
         ports:
           - 4222:4222
-        options: >-
-          --health-cmd "curl -f http://localhost:8222/varz || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout code
@@ -92,9 +87,9 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Install dependencies
-        run: go mod download
-        
+      - name: Install system dependencies (Fyne/desktop)
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev
+
       - name: Run unit tests
         run: go test -v -race -coverprofile=coverage.out ./... || true
         env:
@@ -116,7 +111,12 @@ jobs:
           NATS_URL: nats://localhost:4222
 
       - name: Generate coverage report
-        run: go tool cover -html=coverage.out -o coverage.html
+        run: |
+          if [ -f coverage.out ]; then
+            go tool cover -html=coverage.out -o coverage.html
+          else
+            echo "No coverage file found" > coverage.html
+          fi
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -157,6 +157,9 @@ jobs:
         run: |
           mkdir -p bin
           go build -o bin/web-app ./cmd/main.go
+
+      - name: Install desktop build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libgl1-mesa-dev xorg-dev
 
       - name: Build desktop application
         run: |
