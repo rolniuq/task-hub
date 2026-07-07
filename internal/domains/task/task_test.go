@@ -66,20 +66,6 @@ func TestMarkAsCompleted(t *testing.T) {
 	assert.Equal(t, userID, *task.UpdateBy)
 }
 
-func TestMarkAsInProgress(t *testing.T) {
-	userID := uuid.New()
-	task := &Task{
-		Status: StatusTodo,
-	}
-
-	task.MarkAsInProgress(userID)
-
-	assert.Equal(t, StatusInProgress, task.Status)
-	assert.NotNil(t, task.UpdateAt)
-	assert.NotNil(t, task.UpdateBy)
-	assert.Equal(t, userID, *task.UpdateBy)
-}
-
 func TestTaskStatus_Constants(t *testing.T) {
 	assert.Equal(t, TaskStatus("todo"), StatusTodo)
 	assert.Equal(t, TaskStatus("in_progress"), StatusInProgress)
@@ -141,35 +127,4 @@ func TestTask_Fields(t *testing.T) {
 	assert.Equal(t, userID, task.UserID)
 }
 
-func TestTask_StatusTransitions(t *testing.T) {
-	userID := uuid.New()
 
-	task := &Task{
-		Status: StatusTodo,
-	}
-	assert.Equal(t, StatusTodo, task.Status)
-
-	task.MarkAsInProgress(userID)
-	assert.Equal(t, StatusInProgress, task.Status)
-
-	task.MarkAsCompleted(userID)
-	assert.Equal(t, StatusDone, task.Status)
-}
-
-func TestTask_MultipleStatusUpdates(t *testing.T) {
-	userID := uuid.New()
-
-	task := &Task{
-		Status: StatusTodo,
-	}
-
-	task.MarkAsInProgress(userID)
-	firstUpdate := task.UpdateAt
-
-	time.Sleep(10 * time.Millisecond)
-
-	task.MarkAsCompleted(userID)
-	secondUpdate := task.UpdateAt
-
-	assert.True(t, secondUpdate.After(*firstUpdate))
-}

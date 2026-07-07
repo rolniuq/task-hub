@@ -1,10 +1,10 @@
 # Task Hub
 
-[![CI/CD Pipeline](https://github.com/${{ github.repository }}/actions/workflows/ci.yml/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/ci.yml)
-[![Dependencies](https://github.com/${{ github.repository }}/actions/workflows/dependencies.yml/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/dependencies.yml)
-[![Performance](https://github.com/${{ github.repository }}/actions/workflows/performance.yml/badge.svg)](https://github.com/${{ github.repository }}/actions/workflows/performance.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/${{ github.repository }})](https://goreportcard.com/report/github.com/${{ github.repository }})
-[![Coverage](https://codecov.io/gh/${{ github.repository }}/branch/main/graph/badge.svg)](https://codecov.io/gh/${{ github.repository }})
+[![CI/CD Pipeline](https://github.com/rolniuq/task-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/rolniuq/task-hub/actions/workflows/ci.yml)
+[![Dependencies](https://github.com/rolniuq/task-hub/actions/workflows/dependencies.yml/badge.svg)](https://github.com/rolniuq/task-hub/actions/workflows/dependencies.yml)
+[![Performance](https://github.com/rolniuq/task-hub/actions/workflows/performance.yml/badge.svg)](https://github.com/rolniuq/task-hub/actions/workflows/performance.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/rolniuq/task-hub)](https://goreportcard.com/report/github.com/rolniuq/task-hub)
+[![Coverage](https://codecov.io/gh/rolniuq/task-hub/branch/main/graph/badge.svg)](https://codecov.io/gh/rolniuq/task-hub)
 
 A modern task management application with both web and desktop interfaces built with Go, PostgreSQL, and NATS messaging.
 
@@ -20,7 +20,7 @@ A modern task management application with both web and desktop interfaces built 
 
 ## 📋 Prerequisites
 
-- **Go**: 1.25 or higher
+- **Go**: 1.24 or higher
 - **PostgreSQL**: 16 or higher
 - **NATS Server**: 2.9 or higher
 - **Docker**: 20.10 or higher (for containerized deployment)
@@ -38,9 +38,17 @@ go install github.com/go-task/task/v3/cmd/task@latest
 git clone <repository-url>
 cd task-hub
 
-# Copy environment file
-cp .env.example .env
-# Edit .env with your configuration
+# Create environment file (required)
+cat > .env << EOF
+PORT=8080
+NATS_URL=nats://localhost:4222
+JWT_SECRET=your_jwt_secret_key_at_least_32_characters
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=taskhub
+DB_PASSWORD=dev_password
+DB_NAME=taskhub
+EOF
 
 # Start development services (PostgreSQL + NATS)
 task run
@@ -94,7 +102,7 @@ task-hub/
 │   ├── gateway/           # External service integration
 │   └── handler/           # HTTP handlers
 ├── pkg/                   # Public library code
-│   ├── base/              # Base entities and repositories
+│   ├── base/entity/       # Base entity types
 │   ├── db/                # Database configuration
 │   ├── logger/            # Logging utilities
 │   ├── middleware/        # HTTP middleware
@@ -105,11 +113,9 @@ task-hub/
 │   └── templates/         # HTML templates
 ├── config/                # Configuration management
 ├── docs/                  # Documentation
-├── .env.example           # Environment template
 ├── Taskfile.yml           # Task runner configuration
 ├── docker-compose.yml     # Docker services
 ├── Dockerfile             # Web app container
-├── Dockerfile.desktop     # Desktop app container
 └── README.md
 ```
 
@@ -165,12 +171,11 @@ task clean                # Clean Docker images, volumes, containers
 
 ## 🔐 Configuration
 
-Copy `.env.example` to `.env` and configure:
+Create a `.env` file in the project root:
 
 ```bash
-# Application
-APP_ENV=development
-SERVER_PORT=8080
+# Server
+PORT=8080
 
 # Database
 DB_HOST=localhost
@@ -184,9 +189,6 @@ JWT_SECRET=your_jwt_secret_key_at_least_32_characters
 
 # NATS
 NATS_URL=nats://localhost:4222
-
-# Logging
-LOG_LEVEL=debug
 ```
 
 ## 🧪 Testing
@@ -198,8 +200,8 @@ go test ./...
 # Run tests with coverage
 go test -cover ./...
 
-# Run integration tests
-go test -tags=integration ./tests/...
+# Run tests with race detection
+go test -race ./...
 ```
 
 ## 📱 Desktop UI Features

@@ -24,6 +24,11 @@ func NewApp(authService *app.AuthService) *DesktopApp {
 	fyneApp := fyneApp.New()
 	fyneApp.Settings().SetTheme(&CustomTheme{})
 
+	// Set app icon
+	if icon := generateIcon(); icon != nil {
+		fyneApp.SetIcon(icon)
+	}
+
 	return &DesktopApp{
 		fyneApp:     fyneApp,
 		authService: authService,
@@ -41,6 +46,11 @@ func (d *DesktopApp) createMainWindow() {
 	d.mainWindow.Resize(fyne.NewSize(450, 700))
 	d.mainWindow.CenterOnScreen()
 	d.mainWindow.SetFixedSize(false)
+
+	// Set window icon
+	if icon := generateIcon(); icon != nil {
+		d.mainWindow.SetIcon(icon)
+	}
 }
 
 func (d *DesktopApp) showLoginScreen() {

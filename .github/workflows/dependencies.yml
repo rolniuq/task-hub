@@ -24,7 +24,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.24'
 
       - name: Update dependencies
         run: |
@@ -71,7 +71,7 @@ jobs:
       - name: Run govulncheck
         uses: golang/govulncheck-action@v1
         with:
-          go-version: '1.25'
+          go-version: '1.24'
           check-latest: true
 
       - name: Run Snyk to check for vulnerabilities
