@@ -64,8 +64,18 @@ func (h spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Serve static assets directly
 	if strings.HasPrefix(urlPath, "/assets/") || urlPath == "/vite.svg" {
-		// Strip the leading slash and join with static path
-		filePath := filepath.Join(h.staticPath, urlPath)
+		// Clean path and ensure no directory traversal
+		cleanPath := filepath.Clean(urlPath)
+		filePath := filepath.Join(h.staticPath, cleanPath)
+
+		// Safety check: ensure the resolved path stays within staticPath
+		absStatic, _ := filepath.Abs(h.staticPath)
+		absFile, _ := filepath.Abs(filePath)
+		if !strings.HasPrefix(absFile, absStatic) {
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
 		http.ServeFile(w, r, filePath)
 		return
 	}
